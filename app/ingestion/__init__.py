@@ -134,5 +134,14 @@ async def ingest_url(
     metadata: dict | None = None, on_progress: Callable[[int, int], None] | None = None,
     acl: list[str] | None = None,
 ) -> dict:
-    body = fetch_url(url)
-    return await ingest_core(tenant_id, title or url, body, "html", metadata, on_progress, acl)
+    raw = fetch_url(url)
+    # Extract readable text from the fetched HTML so chunk text (and therefore citation
+    # snippets + retrieval quality) aren't polluted by tag soup.
+    from .html_util import html_to_text
+
+    text = html_to_text(raw)
+    # Record the source URL in chunk metadata so the widget can render clickable citations
+    # (PHASE C item #6). Caller-supplied metadata wins if it already sets source_url.
+    base_meta = dict(metadata or {})
+    base_meta.setdefault("source_url", url)
+    return await ingest_core(tenant_id, title or url, text, "html", base_meta, on_progress, acl)
